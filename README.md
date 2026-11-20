@@ -1,0 +1,290 @@
+# ☁️ AWS Cost Optimization System
+
+<p align="center">
+
+<img src="architecture.png" width="900"/>
+
+</p>
+
+---
+
+## 📌 Overview
+
+An end-to-end AWS Serverless Cost Optimization System that automatically analyzes AWS resources, identifies idle or underutilized services, and generates cost optimization reports.
+
+The project integrates GitHub, Jenkins CI, SonarQube, Docker, AWS Lambda, EventBridge, SNS, and Boto3 to automate code quality checks, deployment, and scheduled cost analysis.
+
+---
+
+# 🚀 Features
+
+- ✅ Detect stopped EC2 instances
+- ✅ Find unused EBS Volumes
+- ✅ Identify old EBS Snapshots
+- ✅ Detect unattached Elastic IPs
+- ✅ List S3 Buckets
+- ✅ List RDS Instances
+- ✅ Generate AWS Cost Optimization Report
+- ✅ Send Email Notifications using SNS
+- ✅ Scheduled execution with EventBridge
+- ✅ Fully automated CI Pipeline using Jenkins
+- ✅ Dockerized deployment
+- ✅ Static Code Analysis using SonarQube
+
+---
+
+# 🏗 Architecture
+
+<p align="center">
+
+<img src="architecture.png" width="1000"/>
+
+</p>
+
+---
+
+# ⚙️ Tech Stack
+
+| Category | Technologies |
+|-----------|--------------|
+| Programming | Python |
+| Cloud | AWS Lambda, SNS, EventBridge, IAM |
+| AWS SDK | Boto3 |
+| CI | Jenkins |
+| Code Quality | SonarQube |
+| Containerization | Docker |
+| Repository | GitHub |
+| Automation | GitHub Webhook |
+| Scheduler | EventBridge |
+| Notification | SNS Email |
+
+---
+
+# 🔄 Project Workflow
+
+```text
+Developer
+      │
+      ▼
+GitHub Repository
+      │
+      ▼
+GitHub Webhook
+      │
+      ▼
+Jenkins Pipeline
+      │
+      ├────────► SonarQube Scan
+      │
+      ├────────► Docker Build
+      │
+      ├────────► Push Image to Docker Hub
+      │
+      └────────► Deploy AWS Lambda
+                       │
+                       ▼
+              EventBridge Scheduler
+                       │
+                       ▼
+              Lambda Function
+                       │
+             AWS Resource Scan
+                       │
+       EC2 • S3 • EBS • RDS • Snapshots
+                       │
+                       ▼
+              Cost Optimization Report
+                       │
+                       ▼
+                 Amazon SNS
+                       │
+                       ▼
+                Email Notification
+```
+
+---
+
+# 📂 Project Structure
+
+```
+aws-cost-optimization/
+│
+├── src/
+│   ├── ec2.py
+│   ├── ebs.py
+│   ├── s3.py
+│   ├── rds.py
+│   ├── snapshots.py
+│   ├── notification.py
+│   ├── report.py
+│   └── lambda_function.py
+│
+├── screenshots/
+│
+├── Dockerfile
+├── Jenkinsfile
+├── requirements.txt
+├── architecture.png
+├── README.md
+└── test.py
+```
+
+---
+
+# 📸 Project Screenshots
+
+## Jenkins Pipeline
+
+![](screenshots/jenkins_pipeline.png)
+
+---
+
+## Jenkins Successful Build
+
+![](screenshots/jenkins_success.png)
+
+---
+
+## GitHub Webhook Trigger
+
+![](screenshots/github_trigger.png)
+
+---
+
+## SonarQube Analysis
+
+![](screenshots/sonarqube.png)
+
+---
+
+## Docker Hub Image
+
+![](screenshots/dockerhub.png)
+
+---
+
+## AWS Lambda
+
+![](screenshots/lambda_function.png)
+
+---
+
+## Lambda IAM Role
+
+![](screenshots/lambda_role.png)
+
+---
+
+## EventBridge Scheduler
+
+![](screenshots/Eventbridge.png)
+
+---
+
+## SNS Topic
+
+![](screenshots/sns.png)
+
+---
+
+## SNS Email Notification
+
+![](screenshots/sns_email.png)
+
+---
+
+## EC2 Resources
+
+![](screenshots/Ec2_instance.png)
+
+---
+
+## S3 Bucket
+
+![](screenshots/s3_bkt.png)
+
+---
+
+# 📦 Docker
+
+Build Image
+
+```bash
+docker build -t aws-cost-optimizer .
+```
+
+Run Container
+
+```bash
+docker run aws-cost-optimizer
+```
+
+---
+
+# ⚡ Jenkins Pipeline Stages
+
+- Workspace Cleanup
+- Git Checkout
+- Python Environment Setup
+- Install Dependencies
+- AWS Cost Analysis
+- SonarQube Scan
+- Docker Image Build
+- Trivy Scan
+- Push Docker Image
+- Deploy AWS Lambda
+
+---
+
+# 📈 AWS Services Used
+
+- AWS Lambda
+- Amazon SNS
+- Amazon EventBridge
+- Amazon IAM
+- Amazon EC2
+- Amazon EBS
+- Amazon S3
+- Amazon RDS
+
+---
+
+# 📬 Email Report
+
+The generated report includes:
+
+- Stopped EC2 Instances
+- Unused EBS Volumes
+- Old Snapshots
+- Unused Elastic IPs
+- S3 Buckets
+- RDS Instances
+
+Automatically delivered through Amazon SNS.
+
+---
+
+# 🎯 Future Improvements
+
+- Cost Explorer Integration
+- Trusted Advisor Integration
+- AWS Budgets Support
+- Slack Notifications
+- Grafana Dashboard
+- Multi-Account AWS Support
+- Daily Cost Trend Analytics
+
+---
+
+# 👩‍💻 Author
+
+**Riya Kumari**
+
+DevOps & Cloud Engineer
+
+- LinkedIn: https://www.linkedin.com/in/riya-kumari-79a709302/
+- GitHub: https://github.com/Riya-te
+
+---
+
+## ⭐ If you like this project, don't forget to Star the repository!
