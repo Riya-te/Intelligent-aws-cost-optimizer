@@ -3,14 +3,11 @@ from botocore.exceptions import ClientError, BotoCoreError
 from src.aws_session import get_client
 
 
+
 def get_ec2_client(region_name=None):
-    """Create an EC2 client using the configured AWS session."""
-    if region_name:
-        import boto3
-        return boto3.Session(
-            profile_name="new-account",
-            region_name=region_name
-        ).client("ec2")
+    """Create an EC2 client using the shared AWS session."""
+    return get_client("ec2", region_name=region_name)
+
 
     return get_client("ec2")
 

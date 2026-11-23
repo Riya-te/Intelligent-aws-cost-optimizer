@@ -3,14 +3,14 @@ from botocore.exceptions import ClientError, BotoCoreError
 from src.aws_session import get_client
 
 
-def get_ec2_client():
+def get_ec2_client(region_name=None):
     """Create an EC2 client using the configured AWS session."""
-    return get_client("ec2")
+    return get_client("ec2", region_name=region_name)
 
 
-def get_all_elastic_ips():
+def get_all_elastic_ips(region_name=None):
     """Retrieve all Elastic IP addresses."""
-    ec2 = get_ec2_client()
+    ec2 = get_ec2_client(region_name)
 
     try:
         response = ec2.describe_addresses()
@@ -34,9 +34,9 @@ def get_all_elastic_ips():
         ) from error
 
 
-def get_unused_elastic_ips():
+def get_unused_elastic_ips(region_name=None):
     """Identify Elastic IPs not associated with a resource."""
     return [
-        ip for ip in get_all_elastic_ips()
+        ip for ip in get_all_elastic_ips(region_name)
         if not ip["AssociationId"]
     ]
