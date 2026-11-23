@@ -1,35 +1,42 @@
-import boto3
 
-ec2 = boto3.client("ec2")
+from botocore.exceptions import ClientError, BotoCoreError
+from src.aws_session import get_client
+
+
+def get_ec2_client():
+    """Create an EC2 client using the configured AWS session."""
+    return get_client("ec2")
 
 
 def get_all_elastic_ips():
-    """
-    Returns all Elastic IP addresses.
-    """
-    response = ec2.describe_addresses()
+    """Retrieve all Elastic IP addresses."""
+    ec2 = get_ec2_client()
 
-    elastic_ips = []
+    try:
+        response = ec2.describe_addresses()
+        elastic_ips = []
 
-    for address in response["Addresses"]:
-        elastic_ips.append({
-            "PublicIp": address.get("PublicIp"),
-            "AllocationId": address.get("AllocationId"),
-            "AssociationId": address.get("AssociationId"),
-            "InstanceId": address.get("InstanceId"),
-        })
+        for address in response.get("Addresses", []):
+            elastic_ips.append({
+                "PublicIp": address.get("PublicIp"),
+                "AllocationId": address.get("AllocationId"),
+                "AssociationId": address.get("AssociationId"),
+                "InstanceId": address.get("InstanceId"),
+                "Domain": address.get("Domain"),
+                "NetworkInterfaceId": address.get("NetworkInterfaceId"),
+            })
 
-    return elastic_ips
+        return elastic_ips
+
+    except (ClientError, BotoCoreError) as error:
+        raise RuntimeError(
+            f"Unable to retrieve Elastic IPs: {error}"
+        ) from error
 
 
 def get_unused_elastic_ips():
-    """
-    Returns Elastic IPs that are not associated with any instance.
-    """
-    unused_ips = []
-
-    for ip in get_all_elastic_ips():
-        if ip["AssociationId"] is None:
-            unused_ips.append(ip)
-
-    return unused_ips
+    """Identify Elastic IPs not associated with a resource."""
+    return [
+        ip for ip in get_all_elastic_ips()
+        if not ip["AssociationId"]
+    ]

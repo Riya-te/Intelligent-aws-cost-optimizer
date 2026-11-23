@@ -1,3 +1,5 @@
+
+from datetime import datetime, timezone
 from src.ec2 import get_stopped_instances
 from src.ebs import get_unattached_volumes
 from src.snapshot import get_old_snapshots
@@ -6,91 +8,116 @@ from src.s3 import get_all_buckets
 from src.rds import get_all_rds_instances
 
 
-def generate_report():
-    report = []
+def collect_report_data():
+    """Collect AWS resources and generate recommendations."""
 
-    report.append("=" * 70)
-    report.append("        AWS COST OPTIMIZATION REPORT")
-    report.append("=" * 70)
-
-    # EC2
-    report.append("\nStopped EC2 Instances")
-    report.append("-" * 70)
+    recommendations = []
 
     stopped = get_stopped_instances()
-
-    if stopped:
-        for instance in stopped:
-            report.append(
-                f"{instance['InstanceId']} | {instance['InstanceType']} | {instance['AvailabilityZone']}"
-            )
-    else:
-        report.append("No stopped EC2 instances.")
-
-    # EBS
-    report.append("\nUnused EBS Volumes")
-    report.append("-" * 70)
-
     volumes = get_unattached_volumes()
-
-    if volumes:
-        for volume in volumes:
-            report.append(
-                f"{volume['VolumeId']} | {volume['Size']} GB | {volume['VolumeType']}"
-            )
-    else:
-        report.append("No unattached EBS volumes.")
-
-    # Snapshots
-    report.append("\nOld Snapshots")
-    report.append("-" * 70)
-
     snapshots = get_old_snapshots()
-
-    if snapshots:
-        for snapshot in snapshots:
-            report.append(
-                f"{snapshot['SnapshotId']} | {snapshot['AgeInDays']} days"
-            )
-    else:
-        report.append("No old snapshots.")
-
-    # Elastic IP
-    report.append("\nUnused Elastic IPs")
-    report.append("-" * 70)
-
     eips = get_unused_elastic_ips()
-
-    if eips:
-        for ip in eips:
-            report.append(ip["PublicIp"])
-    else:
-        report.append("No unused Elastic IPs.")
-
-    # S3
-    report.append("\nS3 Buckets")
-    report.append("-" * 70)
-
     buckets = get_all_buckets()
-
-    if buckets:
-        for bucket in buckets:
-            report.append(bucket["BucketName"])
-    else:
-        report.append("No S3 buckets.")
-
-    # RDS
-    report.append("\nRDS Instances")
-    report.append("-" * 70)
-
     databases = get_all_rds_instances()
 
-    if databases:
-        for db in databases:
-            report.append(
-                f"{db['DBInstanceIdentifier']} | {db['Engine']} | {db['Status']}"
-            )
+    for instance in stopped:
+        recommendations.append(
+            f"Review stopped EC2 instance {instance['InstanceId']}. "
+            "Attached EBS volumes may still incur charges."
+        )
+
+    for volume in volumes:
+        recommendations.append(
+            f"Review unattached EBS volume {volume['VolumeId']} "
+            f"({volume['Size']} GB) before deletion."
+        )
+
+    for snapshot in snapshots:
+        recommendations.append(
+            f"Review snapshot {snapshot['SnapshotId']} "
+            "for backup retention requirements."
+        )
+
+    for ip in eips:
+        recommendations.append(
+            f"Review unused Elastic IP {ip['PublicIp']} "
+            "for release if no longer required."
+        )
+
+    return {
+        "project": "Intelligent AWS Cost Optimizer",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "region": "ap-south-1",
+        "summary": {
+            "stopped_ec2": len(stopped),
+            "unattached_ebs": len(volumes),
+            "old_snapshots": len(snapshots),
+            "unused_elastic_ips": len(eips),
+            "s3_buckets": len(buckets),
+            "rds_instances": len(databases),
+            "recommendations": len(recommendations)
+        },
+        "resources": {
+            "stopped_ec2": stopped,
+            "unattached_ebs": volumes,
+            "old_snapshots": snapshots,
+            "unused_elastic_ips": eips,
+            "s3_buckets": buckets,
+            "rds_instances": databases
+        },
+        "recommendations": recommendations
+    }
+
+
+def generate_report():
+    """Generate a readable text report."""
+
+    data = collect_report_data()
+    report = []
+
+    report.append("=" * 75)
+    report.append("       INTELLIGENT AWS COST OPTIMIZATION REPORT")
+    report.append("=" * 75)
+    report.append(f"Generated At: {data['generated_at']}")
+    report.append(f"Region: {data['region']}")
+
+    sections = [
+        ("STOPPED EC2 INSTANCES", data["resources"]["stopped_ec2"]),
+        ("UNATTACHED EBS VOLUMES", data["resources"]["unattached_ebs"]),
+        ("OLD EBS SNAPSHOTS", data["resources"]["old_snapshots"]),
+        ("UNUSED ELASTIC IP ADDRESSES", data["resources"]["unused_elastic_ips"]),
+        ("S3 BUCKETS", data["resources"]["s3_buckets"]),
+        ("RDS DATABASE INSTANCES", data["resources"]["rds_instances"])
+    ]
+
+    for title, resources in sections:
+        report.append(f"\n{title}")
+        report.append("-" * 75)
+
+        if not resources:
+            report.append("No resources found.")
+            continue
+
+        for resource in resources:
+            report.append(str(resource))
+
+    report.append("\nCOST OPTIMIZATION RECOMMENDATIONS")
+    report.append("-" * 75)
+
+    if data["recommendations"]:
+        for index, recommendation in enumerate(
+            data["recommendations"], 1
+        ):
+            report.append(f"{index}. {recommendation}")
     else:
-        report.append("No RDS instances.")
+        report.append("No immediate resource-level recommendations found.")
+
+    report.append("\n" + "=" * 75)
+    report.append("END OF REPORT")
+    report.append("=" * 75)
 
     return "\n".join(report)
+
+
+if __name__ == "__main__":
+    print(generate_report())
