@@ -1,52 +1,47 @@
+
 pipeline {
     agent any
+
     environment {
         IMAGE_NAME = "riuu1110/aws-cost-optimizer"
-        IMAGE_TAG  = "latest"
+        IMAGE_TAG = "latest"
     }
 
     stages {
 
-        stage('Clean Workspace') {
-            steps {
-                deleteDir()
-            }
-        }
-
         stage('Checkout Code') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/Riya-te/aws-cost-optimization.git'
+                git branch: 'feature/professional-upgrade',
+                    url: 'https://github.com/Riya-te/Intelligent-aws-cost-optimizer.git'
             }
         }
 
         stage('Setup Python') {
             steps {
                 sh '''
-                python3 -m venv venv
-
-                . venv/bin/activate
-
-                pip install --upgrade pip
-
-                pip install -r requirements.txt
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    python -m pip install --upgrade pip
+                    pip install -r requirements.txt
                 '''
             }
         }
 
-        stage('Run AWS Cost Optimizer') {
+        stage('Run Unit Tests') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-creds'
-                ]]) {
-
-                    sh '''
+                sh '''
                     . venv/bin/activate
+                    python -m unittest discover -s tests -v
+                '''
+            }
+        }
 
-                    python test.py
-                    '''
-                }
+        stage('Python Compilation') {
+            steps {
+                sh '''
+                    . venv/bin/activate
+                    python -m compileall -q src dashboard tests
+                '''
             }
         }
 
@@ -54,35 +49,37 @@ pipeline {
             steps {
                 script {
                     def scannerHome = tool 'SonarScanner'
-                
-                withSonarQubeEnv('SonarQube') {
-                    sh """
-                     ${scannerHome}/bin/sonar-scanner
-                    """
+
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            ${scannerHome}/bin/sonar-scanner
+                        """
+                    }
                 }
-              }
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 sh '''
-                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                 '''
             }
         }
 
         stage('Trivy Image Scan') {
             steps {
-                sh """
-                trivy image --severity HIGH,CRITICAL ${IMAGE_NAME}:${IMAGE_TAG}
-                """
+                sh '''
+                    trivy image \
+                        --severity HIGH,CRITICAL \
+                        --exit-code 1 \
+                        ${IMAGE_NAME}:${IMAGE_TAG}
+                '''
             }
         }
 
         stage('Push Docker Image') {
             steps {
-
                 withCredentials([
                     usernamePassword(
                         credentialsId: 'dockerhub',
@@ -90,63 +87,26 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
-
                     sh '''
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        echo "$DOCKER_PASS" | docker login \
+                            -u "$DOCKER_USER" --password-stdin
 
-                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
 
-                    docker logout
+                        docker logout
                     '''
                 }
             }
         }
-         stage('Deploy Lambda') {
-           steps {
-
-             withCredentials([[
-               $class: 'AmazonWebServicesCredentialsBinding',
-               credentialsId: 'aws-creds'
-        ]]) {
-
-            sh '''
-            echo "Creating deployment package..."
-
-            rm -f deployment.zip
-
-            zip -r deployment.zip . \
-                -x "venv/*" \
-                   ".git/*" \
-                   "__pycache__/*" \
-                   "*.pyc"
-
-            echo "Updating Lambda..."
-
-            aws lambda update-function-code \
-                --function-name aws-cost-optimizer \
-                --zip-file fileb://deployment.zip \
-                --region ap-south-1
-            '''
-        }
-    }
-}
     }
 
     post {
-
         success {
-            echo "========================================="
-            echo "Pipeline Completed Successfully"
-            echo "SonarQube Scan Completed"
-            echo "Trivy Scan Completed"
-            echo "Docker Image: ${IMAGE_NAME}:${IMAGE_TAG}"
-            echo "========================================="
+            echo 'CI/CD pipeline completed successfully.'
         }
 
         failure {
-            echo "========================================="
-            echo "Pipeline Failed"
-            echo "========================================="
+            echo 'Pipeline failed. Check the failed stage logs.'
         }
 
         always {

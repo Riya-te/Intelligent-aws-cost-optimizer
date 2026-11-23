@@ -1,43 +1,30 @@
 
-import boto3
-from botocore.exceptions import ClientError, BotoCoreError
 from datetime import datetime, timedelta, timezone
 
+from botocore.exceptions import ClientError, BotoCoreError
 
-# ---------------- AWS SESSION ----------------
-
-def get_aws_session():
-    return boto3.Session(
-        profile_name="new-account",
-        region_name="ap-south-1"
-    )
+from src.aws_session import get_client
 
 
-# ---------------- EC2 CLIENT ----------------
+DEFAULT_REGION = "ap-south-1"
+
 
 def get_ec2_client(region_name=None):
-    session = get_aws_session()
+    """Return an EC2 client using the shared AWS session."""
+    return get_client("ec2", region_name or DEFAULT_REGION)
 
-    return session.client(
-        "ec2",
-        region_name=region_name or "ap-south-1"
-    )
-
-
-# ---------------- GET ALL INSTANCES ----------------
 
 def get_all_instances(region_name=None):
+    """Retrieve all EC2 instances with their basic details."""
 
     ec2 = get_ec2_client(region_name)
+    instances = []
 
     try:
         paginator = ec2.get_paginator("describe_instances")
-        instances = []
 
         for page in paginator.paginate():
-
             for reservation in page.get("Reservations", []):
-
                 for instance in reservation.get("Instances", []):
 
                     tags = {
@@ -50,7 +37,9 @@ def get_all_instances(region_name=None):
                         "Name": tags.get("Name", "Unnamed"),
                         "State": instance["State"]["Name"],
                         "InstanceType": instance["InstanceType"],
-                        "AvailabilityZone": instance["Placement"]["AvailabilityZone"],
+                        "AvailabilityZone": instance.get(
+                            "Placement", {}
+                        ).get("AvailabilityZone"),
                         "LaunchTime": instance["LaunchTime"].isoformat(),
                         "Platform": instance.get(
                             "PlatformDetails", "Linux/UNIX"
@@ -66,39 +55,35 @@ def get_all_instances(region_name=None):
         ) from error
 
 
-# ---------------- STOPPED INSTANCES ----------------
-
 def get_stopped_instances(region_name=None):
-
-    instances = get_all_instances(region_name)
-
+    """Return stopped EC2 instances."""
     return [
-        instance for instance in instances
+        instance
+        for instance in get_all_instances(region_name)
         if instance["State"] == "stopped"
     ]
 
 
-# ---------------- RUNNING INSTANCES ----------------
-
 def get_running_instances(region_name=None):
-
-    instances = get_all_instances(region_name)
-
+    """Return running EC2 instances."""
     return [
-        instance for instance in instances
+        instance
+        for instance in get_all_instances(region_name)
         if instance["State"] == "running"
     ]
 
 
-# ---------------- CLOUDWATCH CPU METRICS ----------------
+def get_cpu_metrics(instance_id, region_name=None, days=7):
+    """
+    Retrieve and summarize EC2 CPU utilization from CloudWatch.
 
-def get_cpu_utilization(instance_id, region_name=None, days=7):
+    Returns average, minimum, maximum and number of data points.
+    Returns None when no metrics are available.
+    """
 
-    session = get_aws_session()
-
-    cloudwatch = session.client(
+    cloudwatch = get_client(
         "cloudwatch",
-        region_name=region_name or "ap-south-1"
+        region_name or DEFAULT_REGION
     )
 
     end_time = datetime.now(timezone.utc)
@@ -117,7 +102,7 @@ def get_cpu_utilization(instance_id, region_name=None, days=7):
             StartTime=start_time,
             EndTime=end_time,
             Period=3600,
-            Statistics=["Average"]
+            Statistics=["Average", "Minimum", "Maximum"]
         )
 
         datapoints = response.get("Datapoints", [])
@@ -125,13 +110,47 @@ def get_cpu_utilization(instance_id, region_name=None, days=7):
         if not datapoints:
             return None
 
-        average_cpu = sum(
+        average_values = [
             point["Average"] for point in datapoints
-        ) / len(datapoints)
+        ]
 
-        return round(average_cpu, 2)
+        return {
+            "InstanceId": instance_id,
+            "AverageCPU": round(
+                sum(average_values) / len(average_values), 2
+            ),
+            "MinimumCPU": round(
+                min(point["Minimum"] for point in datapoints), 2
+            ),
+            "MaximumCPU": round(
+                max(point["Maximum"] for point in datapoints), 2
+            ),
+            "DatapointCount": len(datapoints),
+            "PeriodHours": 1,
+            "ObservationDays": days
+        }
 
     except (ClientError, BotoCoreError) as error:
         raise RuntimeError(
             f"Unable to retrieve CPU metrics for {instance_id}: {error}"
         ) from error
+
+
+def get_cpu_utilization(instance_id, region_name=None, days=7):
+    """
+    Backward-compatible function.
+
+    Returns average CPU utilization as a float,
+    or None when CloudWatch has no metrics.
+    """
+
+    metrics = get_cpu_metrics(
+        instance_id,
+        region_name=region_name,
+        days=days
+    )
+
+    if metrics is None:
+        return None
+
+    return metrics["AverageCPU"]

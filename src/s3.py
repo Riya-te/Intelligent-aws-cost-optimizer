@@ -1,4 +1,5 @@
-
+import json
+import os
 from datetime import timezone
 from botocore.exceptions import ClientError, BotoCoreError
 from src.aws_session import get_client
@@ -93,3 +94,74 @@ def get_all_buckets():
 def get_bucket_count():
     """Return the total number of S3 buckets."""
     return len(get_all_buckets())
+
+# S3-based notification history
+
+ALERT_STATE_BUCKET = os.getenv(
+    "ALERT_STATE_BUCKET",
+    "intelligent-aws-cost-reports-642615934978"
+)
+
+ALERT_STATE_KEY = "alert-history/recommendation-alert-state.json"
+
+
+def get_alert_history():
+    """
+    Retrieve previously stored recommendation alert history from S3.
+    Returns an empty dictionary if no history exists yet.
+    """
+
+    s3 = get_s3_client()
+
+    try:
+        response = s3.get_object(
+            Bucket=ALERT_STATE_BUCKET,
+            Key=ALERT_STATE_KEY
+        )
+
+        content = response["Body"].read().decode("utf-8")
+
+        return json.loads(content)
+
+    except ClientError as error:
+        error_code = error.response.get(
+            "Error", {}
+        ).get("Code")
+
+        if error_code in ("NoSuchKey", "404", "NotFound"):
+            return {}
+
+        raise RuntimeError(
+            f"Unable to retrieve alert history: {error}"
+        ) from error
+
+    except (BotoCoreError, json.JSONDecodeError) as error:
+        raise RuntimeError(
+            f"Unable to process alert history: {error}"
+        ) from error
+
+
+def save_alert_history(history):
+    """
+    Save recommendation alert history in S3.
+    """
+
+    if not isinstance(history, dict):
+        raise ValueError("Alert history must be a dictionary.")
+
+    s3 = get_s3_client()
+
+    try:
+        s3.put_object(
+            Bucket=ALERT_STATE_BUCKET,
+            Key=ALERT_STATE_KEY,
+            Body=json.dumps(history, indent=4).encode("utf-8"),
+            ContentType="application/json"
+        )
+
+        return True
+
+    except (ClientError, BotoCoreError) as error:
+        raise RuntimeError(
+            f"Unable to save alert history: {error}"
+        ) from error

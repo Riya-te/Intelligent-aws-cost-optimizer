@@ -85,6 +85,13 @@ def get_aws_identity():
     }
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_cost_report(months=6):
+    """Load Cost Explorer data and cache it for one hour."""
+    from src.cost_explorer import get_cost_report
+    return get_cost_report(months=months)
+
+
 # ============================================================
 # DEMO DATA
 # ============================================================
@@ -153,6 +160,21 @@ def get_demo_data():
                 "Engine": "mysql",
                 "Status": "available"
             }
+        ],
+
+        # Illustrative sample only; not measured AWS telemetry.
+        "ec2_cpu_analysis": [
+            {
+                "resource_id": "i-demo002",
+                "resource_name": "Demo Running Instance",
+                "resource_type": "EC2",
+                "status": "potentially_underutilized",
+                "average_cpu": 5.2,
+                "maximum_cpu": 18.4,
+                "datapoints": 168,
+                "message": "Illustrative low CPU utilization.",
+                "action": "Review workload before resizing."
+            }
         ]
     }
 
@@ -169,6 +191,7 @@ def get_live_data():
     from src.snapshot import get_old_snapshots
     from src.s3 import get_all_buckets
     from src.rds import get_all_rds_instances
+    from src.recommendation_engine import analyze_ec2_utilization
 
     return {
         "ec2": get_all_instances(),
@@ -176,7 +199,8 @@ def get_live_data():
         "eip": get_unused_elastic_ips(),
         "snapshots": get_old_snapshots(),
         "s3": get_all_buckets(),
-        "rds": get_all_rds_instances()
+        "rds": get_all_rds_instances(),
+        "ec2_cpu_analysis": analyze_ec2_utilization(days=7)
     }
 
 
@@ -248,7 +272,8 @@ def normalize_lambda_report(report):
         "eip": resources.get("unused_elastic_ips", []),
         "snapshots": resources.get("old_snapshots", []),
         "s3": resources.get("s3_buckets", []),
-        "rds": resources.get("rds_instances", [])
+        "rds": resources.get("rds_instances", []),
+        "ec2_cpu_analysis": resources.get("ec2_cpu_analysis", [])
     }
 
 
@@ -259,6 +284,8 @@ def normalize_lambda_report(report):
 identity = None
 lambda_report = None
 report_key = None
+cost_report = None
+cost_report_error = None
 
 try:
 
@@ -286,7 +313,10 @@ try:
         col2.metric("AWS Region", identity["region"])
         col3.metric(
             "Resources Found",
-            sum(len(resources) for resources in data.values())
+            sum(
+                len(data.get(key, []))
+                for key in ("ec2", "ebs", "eip", "snapshots", "s3", "rds")
+            )
         )
 
         st.caption(f"Connected identity: {identity['arn']}")
@@ -331,6 +361,15 @@ except Exception as error:
     st.stop()
 
 
+# Cost Explorer is optional and cached; billing errors do not stop resource scanning.
+if mode == "Live AWS Mode":
+    try:
+        with st.spinner("Loading AWS billing data from Cost Explorer..."):
+            cost_report = load_cost_report(months=6)
+    except Exception as error:
+        cost_report_error = str(error)
+
+
 # ============================================================
 # RESOURCE VARIABLES
 # ============================================================
@@ -341,6 +380,7 @@ eip = data["eip"]
 snapshots = data["snapshots"]
 s3_buckets = data["s3"]
 rds = data["rds"]
+ec2_cpu_analysis = data.get("ec2_cpu_analysis", [])
 
 resource_mapping = {
     "EC2": ec2,
@@ -359,6 +399,96 @@ resource_counts = {
     "S3 Buckets": len(s3_buckets),
     "RDS Databases": len(rds)
 }
+
+
+# ============================================================
+# COST REPORT DISPLAY
+# ============================================================
+
+def display_cost_report(show_details=True):
+    """Display actual Cost Explorer results when available."""
+
+    if cost_report_error:
+        st.warning(f"Cost Explorer data unavailable: {cost_report_error}")
+        return
+
+    if not cost_report:
+        st.info(
+            "Actual billing data is available in Live AWS Mode. "
+            "Demo and Lambda report modes do not load Cost Explorer data."
+        )
+        return
+
+    currency = cost_report.get("currency", "USD")
+    total = cost_report.get("total_cost", 0.0)
+    monthly = cost_report.get("monthly_costs", [])
+    services = cost_report.get("service_costs", [])
+
+    period = cost_report.get("period", {})
+    st.caption(
+        f"Cost Explorer period: {period.get('Start', '')} to "
+        f"{period.get('End', '')} (end date exclusive)"
+    )
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Net Unblended Cost", f"{currency} {total:,.8f}")
+    c2.metric("Months Returned", len(monthly))
+    c3.metric("Services Returned", len(services))
+
+    st.caption(
+        "These are actual Cost Explorer UnblendedCost values. "
+        "Negative service amounts may reflect credits, refunds, or billing "
+        "adjustments; they are not automatically treated as savings."
+    )
+
+    if not show_details:
+        return
+
+    if monthly:
+        monthly_df = pd.DataFrame(monthly)
+        monthly_df["amount"] = pd.to_numeric(
+            monthly_df["amount"], errors="coerce"
+        )
+        st.subheader("Monthly AWS Spending")
+        fig = px.bar(
+            monthly_df,
+            x="month",
+            y="amount",
+            title=f"Monthly Unblended Cost ({currency})",
+            labels={"month": "Month", "amount": f"Cost ({currency})"}
+        )
+        st.plotly_chart(fig, width="stretch")
+
+        display_df = monthly_df.copy()
+        display_df["amount"] = display_df["amount"].map(
+            lambda value: f"{value:.8f}"
+        )
+        st.dataframe(display_df, width="stretch", hide_index=True)
+    else:
+        st.info("Cost Explorer returned no monthly cost records.")
+
+    if services:
+        service_df = pd.DataFrame(services)
+        service_df["amount"] = pd.to_numeric(
+            service_df["amount"], errors="coerce"
+        )
+        st.subheader("Service-wise AWS Costs")
+        fig = px.bar(
+            service_df,
+            x="service",
+            y="amount",
+            title=f"Cost by AWS Service ({currency})",
+            labels={"service": "AWS Service", "amount": f"Cost ({currency})"}
+        )
+        st.plotly_chart(fig, width="stretch")
+
+        display_df = service_df.copy()
+        display_df["amount"] = display_df["amount"].map(
+            lambda value: f"{value:.8f}"
+        )
+        st.dataframe(display_df, width="stretch", hide_index=True)
+    else:
+        st.info("Cost Explorer returned no service-level cost records.")
 
 
 # ============================================================
@@ -512,6 +642,78 @@ if page == "Overview":
 
     st.divider()
 
+    st.subheader("💰 Actual AWS Billing Overview")
+    if mode == "Live AWS Mode":
+        display_cost_report(show_details=True)
+    else:
+        st.info(
+            "Switch to Live AWS Mode to retrieve actual AWS billing data. "
+            "No sample billing amounts are displayed."
+        )
+
+    st.divider()
+
+    st.subheader("📉 EC2 CPU Utilization Analysis")
+
+    if ec2_cpu_analysis:
+        cpu_df = pd.DataFrame(ec2_cpu_analysis)
+
+        display_columns = [
+            column for column in (
+                "resource_id",
+                "resource_name",
+                "status",
+                "average_cpu",
+                "maximum_cpu",
+                "datapoints",
+                "message",
+                "action"
+            )
+            if column in cpu_df.columns
+        ]
+
+        st.dataframe(
+            cpu_df[display_columns],
+            width="stretch",
+            hide_index=True
+        )
+
+        if "average_cpu" in cpu_df.columns:
+            chart_df = cpu_df.dropna(subset=["average_cpu"]).copy()
+
+            if not chart_df.empty:
+                label_column = (
+                    "resource_name"
+                    if "resource_name" in chart_df.columns
+                    else "resource_id"
+                )
+                fig_cpu = px.bar(
+                    chart_df,
+                    x=label_column,
+                    y="average_cpu",
+                    title="Average EC2 CPU Utilization",
+                    labels={
+                        "average_cpu": "Average CPU (%)",
+                        label_column: "EC2 Instance"
+                    }
+                )
+                st.plotly_chart(fig_cpu, width="stretch")
+
+        if mode == "Demo Mode":
+            st.caption("Demo CPU values are illustrative sample data.")
+        elif mode == "Latest Lambda Report" and not ec2_cpu_analysis:
+            st.info(
+                "This Lambda report does not contain EC2 CPU analysis. "
+                "Older report formats remain supported."
+            )
+    else:
+        st.info(
+            "No EC2 CPU analysis is available for this data source. "
+            "Live mode requires sufficient CloudWatch metric data."
+        )
+
+    st.divider()
+
     st.subheader("💡 Recommendation Summary")
 
     if recommendations:
@@ -612,6 +814,43 @@ elif page == "Cost Recommendations":
 
     st.divider()
 
+    st.subheader("💰 Actual AWS Cost Explorer Data")
+    if mode == "Live AWS Mode":
+        display_cost_report(show_details=True)
+    else:
+        st.info("Select Live AWS Mode to view actual Cost Explorer billing data.")
+
+    st.divider()
+
+    st.subheader("EC2 CPU-Based Review Candidates")
+
+    if ec2_cpu_analysis:
+        cpu_df = pd.DataFrame(ec2_cpu_analysis)
+        st.dataframe(cpu_df, width="stretch", hide_index=True)
+
+        insufficient = sum(
+            1 for item in ec2_cpu_analysis
+            if item.get("status") == "insufficient_data"
+        )
+        potentially_underutilized = sum(
+            1 for item in ec2_cpu_analysis
+            if item.get("status") == "potentially_underutilized"
+        )
+
+        cpu_col1, cpu_col2 = st.columns(2)
+        cpu_col1.metric("Potentially Underutilized", potentially_underutilized)
+        cpu_col2.metric("Insufficient CloudWatch Data", insufficient)
+
+        st.caption(
+            "CPU thresholds are an initial screening heuristic. "
+            "Review memory, network, workload patterns and business needs "
+            "before changing an instance type."
+        )
+    else:
+        st.info("No CPU analysis records are available.")
+
+    st.divider()
+
     st.subheader("Resource Review Summary")
 
     st.dataframe(
@@ -649,8 +888,36 @@ elif page == "Reports & Downloads":
         f"S3 Buckets: {len(s3_buckets)}",
         f"RDS Databases: {len(rds)}",
         "",
-        "COST OPTIMIZATION RECOMMENDATIONS"
+        "AWS COST EXPLORER SUMMARY"
     ]
+
+    if cost_report:
+        report.extend([
+            f"Currency: {cost_report.get('currency', 'USD')}",
+            f"Net Unblended Cost: {cost_report.get('total_cost', 0.0):.8f}",
+            f"Cost Period: {cost_report.get('period', {})}"
+        ])
+    elif cost_report_error:
+        report.append(f"Cost Explorer unavailable: {cost_report_error}")
+    else:
+        report.append("Cost Explorer data not loaded for this data source.")
+
+    report.extend([
+        "",
+        "EC2 CPU UTILIZATION ANALYSIS"
+    ])
+
+    for item in ec2_cpu_analysis:
+        report.append(
+            f"{item.get('resource_id', 'Unknown')} | "
+            f"Status: {item.get('status', 'Unknown')} | "
+            f"Average CPU: {item.get('average_cpu', 'N/A')}% | "
+            f"Maximum CPU: {item.get('maximum_cpu', 'N/A')}% | "
+            f"Datapoints: {item.get('datapoints', 'N/A')} | "
+            f"{item.get('message', '')}"
+        )
+
+    report.extend(["", "COST OPTIMIZATION RECOMMENDATIONS"])
 
     for item in recommendations:
 
