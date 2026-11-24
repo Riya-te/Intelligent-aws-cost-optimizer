@@ -58,7 +58,15 @@ pipeline {
                 }
             }
         }
-
+        stage('Test Jenkins Shell') {
+    steps {
+        sh '''
+            echo "JENKINS PIPELINE SHELL OK"
+            sleep 5
+            echo "SHELL TEST COMPLETED"
+        '''
+    }
+}
         stage('Build Docker Image') {
             steps {
                 sh '''
