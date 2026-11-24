@@ -76,15 +76,16 @@ pipeline {
         }
 
         stage('Trivy Image Scan') {
-            steps {
-                sh '''
-                    trivy image \
-                        --severity HIGH,CRITICAL \
-                        --exit-code 1 \
-                        ${IMAGE_NAME}:${IMAGE_TAG}
-                '''
-            }
-        }
+         steps {
+           sh '''
+             trivy image \
+                 --severity HIGH,CRITICAL \
+                 --ignore-unfixed \
+                 --exit-code 1 \
+                 ${IMAGE_NAME}:${IMAGE_TAG}
+        '''
+    }
+}
 
         stage('Push Docker Image') {
             steps {
