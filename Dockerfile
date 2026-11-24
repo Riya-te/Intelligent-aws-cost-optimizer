@@ -1,8 +1,6 @@
 
-# Use official Python image
 FROM python:3.13-slim
 
-# Set working directory
 WORKDIR /app
 
 # Update operating system packages
@@ -11,16 +9,17 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first
+# Install Python dependencies
 COPY requirements.txt .
 
-# Install and update Python dependencies
-RUN pip install --no-cache-dir --upgrade pip setuptools && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir --upgrade setuptools
+RUN python -m pip install --no-cache-dir --upgrade pip && \
+    python -m pip install --no-cache-dir -r requirements.txt && \
+    python -m pip install --no-cache-dir --upgrade "setuptools>=78.1.1" && \
+    python -m pip check
 
-# Copy project files
+# Verify setuptools version
+RUN python -c "import setuptools; print('Setuptools:', setuptools.__version__); assert setuptools.__version__ >= '78.1.1'"
+
 COPY . .
 
-# Default command
 CMD ["python", "test.py"]
