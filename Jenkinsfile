@@ -214,7 +214,7 @@ pipeline {
         }
 
         failure {
-            echo 'Pipeline failed. Check the failed stage logs.'
+            echo 'Pipeline failed. Check the failed stage logs and verify it.'
         }
 
         always {
