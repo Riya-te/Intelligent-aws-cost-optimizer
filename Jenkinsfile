@@ -11,7 +11,7 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'git branch: 'main',',
+             git branch: 'main',
                     url: 'https://github.com/Riya-te/Intelligent-aws-cost-optimizer.git'
             }
         }
