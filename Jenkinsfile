@@ -210,7 +210,7 @@ pipeline {
 
     post {
         success {
-            echo 'CI/CD pipeline and Lambda deployment completed successfully.'
+            echo 'CI/CD pipeline and Lambda deployment completed successfully !!.'
         }
 
         failure {
