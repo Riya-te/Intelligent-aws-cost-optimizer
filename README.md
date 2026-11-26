@@ -1,290 +1,371 @@
-# ☁️ AWS Cost Optimization System
+# Intelligent AWS Cost Optimizer with Automated DevSecOps CI/CD Pipeline
 
-<p align="center">
+An AWS-based cost optimization and monitoring system that analyzes cloud resources, identifies potential cost wastage, generates actionable recommendations, and sends automated reports through email. The project also uses a DevSecOps CI/CD pipeline to test, scan, package, and deploy the application.
 
-<img src="architecture.png" width="900"/>
+## Overview
 
-</p>
+Managing cloud infrastructure can become expensive when resources are unused or underutilized. This project helps identify such resources and provides recommendations to improve AWS resource utilization and reduce unnecessary costs.
 
----
+The system uses Python and Boto3 to interact with AWS services, AWS Lambda to execute the analysis, Amazon EventBridge for scheduled execution, and Amazon SNS for email notifications. A Streamlit dashboard provides a visual interface for monitoring resources and viewing recommendations.
 
-## 📌 Overview
+**Important:** The system provides recommendations only. It does not automatically stop, delete, or modify AWS resources.
 
-An end-to-end AWS Serverless Cost Optimization System that automatically analyzes AWS resources, identifies idle or underutilized services, and generates cost optimization reports.
+## Key Features
 
-The project integrates GitHub, Jenkins CI, SonarQube, Docker, AWS Lambda, EventBridge, SNS, and Boto3 to automate code quality checks, deployment, and scheduled cost analysis.
+- **AWS Resource Monitoring:** Checks EC2 instances, EBS volumes, EBS snapshots, Elastic IPs, S3 buckets, and RDS instances.
+- **Cost Optimization Recommendations:** Identifies potentially underutilized or unused resources.
+- **EC2 Utilization Analysis:** Uses CloudWatch CPU metrics to identify instances that may need further utilization review.
+- **Cost Anomaly Analysis:** Checks for cost anomalies based on the project's configured analysis logic and available data.
+- **Automated Reporting:** Generates reports containing resource summaries, findings, and recommendations.
+- **Email Notifications:** Uses Amazon SNS to distribute reports to confirmed email subscribers.
+- **Scheduled Execution:** Uses Amazon EventBridge to trigger AWS Lambda automatically.
+- **Interactive Dashboard:** Uses Streamlit to display AWS resource information, recommendations, and reports.
+- **Demo and Live AWS Modes:** Supports demonstration data as well as live AWS account analysis.
+- **DevSecOps Pipeline:** Automates testing, code analysis, container scanning, image publishing, and Lambda deployment.
 
----
-
-# 🚀 Features
-
-- ✅ Detect stopped EC2 instances
-- ✅ Find unused EBS Volumes
-- ✅ Identify old EBS Snapshots
-- ✅ Detect unattached Elastic IPs
-- ✅ List S3 Buckets
-- ✅ List RDS Instances
-- ✅ Generate AWS Cost Optimization Report
-- ✅ Send Email Notifications using SNS
-- ✅ Scheduled execution with EventBridge
-- ✅ Fully automated CI Pipeline using Jenkins
-- ✅ Dockerized deployment
-- ✅ Static Code Analysis using SonarQube
-
----
-
-# 🏗 Architecture
-
-<p align="center">
-
-<img src="architecture.png" width="1000"/>
-
-</p>
-
----
-
-# ⚙️ Tech Stack
+## Technology Stack
 
 | Category | Technologies |
-|-----------|--------------|
-| Programming | Python |
-| Cloud | AWS Lambda, SNS, EventBridge, IAM |
+|---|---|
+| Programming Language | Python |
 | AWS SDK | Boto3 |
-| CI | Jenkins |
+| Cloud Platform | AWS |
+| Compute | AWS Lambda, Amazon EC2 |
+| Scheduling | Amazon EventBridge |
+| Notifications | Amazon SNS |
+| Monitoring | Amazon CloudWatch |
+| Storage | Amazon S3, Amazon EBS |
+| Database Monitoring | Amazon RDS |
+| Dashboard | Streamlit |
+| CI/CD | Jenkins, GitHub |
 | Code Quality | SonarQube |
 | Containerization | Docker |
-| Repository | GitHub |
-| Automation | GitHub Webhook |
-| Scheduler | EventBridge |
-| Notification | SNS Email |
+| Security Scanning | Trivy |
+| Container Registry | Docker Hub |
 
----
+## System Architecture
 
-# 🔄 Project Workflow
+```mermaid
+flowchart TD
+    A[Streamlit Dashboard] --> B[Python Application]
+    B --> C[Boto3 AWS SDK]
+    C --> D[AWS Resource Analysis]
+    D --> E[EC2 / EBS / S3 / RDS]
+    D --> F[Cost Analysis and Recommendations]
+    F --> G[Report Generation]
+
+    H[Amazon EventBridge] --> I[AWS Lambda]
+    I --> B
+    G --> J[Amazon SNS]
+    J --> K[Email Subscribers]
+
+    subgraph DevSecOps CI/CD Pipeline
+        L[GitHub Repository] --> M[Jenkins]
+        M --> N[Unit Tests]
+        N --> O[SonarQube Analysis]
+        O --> P[Docker Build]
+        P --> Q[Trivy Security Scan]
+        Q --> R[Docker Hub Push]
+        R --> S[Package Lambda]
+        S --> T[Deploy Lambda]
+        T --> U[Deployment Verification]
+    end
+```
+
+## How the Project Works
+
+### 1. AWS Resource Monitoring
+
+The application uses Boto3 to communicate with AWS APIs and collect information about:
+
+- EC2 instances
+- Unattached EBS volumes
+- Older EBS snapshots
+- Unused Elastic IP addresses
+- S3 buckets
+- RDS instances
+
+### 2. Cost Optimization Analysis
+
+The Python recommendation engine analyzes collected resource information and identifies possible optimization opportunities.
+
+Examples include:
+
+- EC2 instances with consistently low CPU utilization.
+- EBS volumes that are not attached to instances.
+- Older snapshots that may need a retention review.
+- Elastic IP addresses that are not associated with running resources.
+
+Recommendations should be reviewed before taking action. For example, low CPU utilization alone is not enough to decide that an EC2 instance should be resized.
+
+### 3. Automated Execution with EventBridge and Lambda
+
+Amazon EventBridge triggers the AWS Lambda function according to a configured schedule.
+
+The Lambda function executes the Python analysis, checks AWS resources, and generates the report.
+
+### 4. Email Notifications with SNS
+
+After report generation, the application publishes a notification to an Amazon SNS topic.
+
+Confirmed email subscribers receive the report notification.
+
+### 5. Streamlit Dashboard
+
+The dashboard provides an interface to view:
+
+- AWS account and region information
+- Resource summaries
+- AWS resource details
+- Cost optimization recommendations
+- Reports and downloadable files
+
+The dashboard supports Live AWS Mode and Demo Mode.
+
+## DevSecOps CI/CD Pipeline
+
+The project uses Jenkins to automate the application build, security checks, and Lambda deployment.
+
+### Pipeline Stages
+
+| Stage | Description |
+|---|---|
+| Checkout Code | Retrieves the source code from GitHub. |
+| Setup Python | Prepares the Python environment. |
+| Run Unit Tests | Executes automated tests. |
+| Python Compilation | Checks Python files for compilation errors. |
+| SonarQube Scan | Performs static code quality analysis. |
+| Docker Build | Builds the application Docker image. |
+| Trivy Scan | Scans the image for HIGH and CRITICAL vulnerabilities with available fixes. |
+| Push Docker Image | Publishes the image to Docker Hub if the scan passes. |
+| Package Lambda | Creates the deployment ZIP package. |
+| Deploy Lambda | Updates the AWS Lambda function code. |
+| Verify Lambda | Checks that the Lambda deployment is successful and the function is active. |
+
+### CI/CD Workflow
 
 ```text
-Developer
-      │
-      ▼
+Developer Push
+      |
+      v
 GitHub Repository
-      │
-      ▼
-GitHub Webhook
-      │
-      ▼
+      |
+      v
 Jenkins Pipeline
-      │
-      ├────────► SonarQube Scan
-      │
-      ├────────► Docker Build
-      │
-      ├────────► Push Image to Docker Hub
-      │
-      └────────► Deploy AWS Lambda
-                       │
-                       ▼
-              EventBridge Scheduler
-                       │
-                       ▼
-              Lambda Function
-                       │
-             AWS Resource Scan
-                       │
-       EC2 • S3 • EBS • RDS • Snapshots
-                       │
-                       ▼
-              Cost Optimization Report
-                       │
-                       ▼
-                 Amazon SNS
-                       │
-                       ▼
-                Email Notification
+      |
+      v
+Unit Tests and Compilation
+      |
+      v
+SonarQube Code Analysis
+      |
+      v
+Docker Image Build
+      |
+      v
+Trivy Security Scan
+      |
+      v
+Docker Hub Push
+      |
+      v
+Lambda ZIP Packaging
+      |
+      v
+AWS Lambda Deployment
+      |
+      v
+Deployment Verification
 ```
 
----
+## Project Setup
 
-# 📂 Project Structure
+### Prerequisites
 
-```
-aws-cost-optimization/
-│
-├── src/
-│   ├── ec2.py
-│   ├── ebs.py
-│   ├── s3.py
-│   ├── rds.py
-│   ├── snapshots.py
-│   ├── notification.py
-│   ├── report.py
-│   └── lambda_function.py
-│
-├── screenshots/
-│
-├── Dockerfile
-├── Jenkinsfile
-├── requirements.txt
-├── architecture.png
-├── README.md
-└── test.py
+- Python 3.12 or compatible Python version for local development.
+- AWS account.
+- AWS CLI.
+- AWS credentials configured locally.
+- Docker.
+- Git.
+- Required AWS permissions for the resources you want to monitor.
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Riya-te/Intelligent-aws-cost-optimizer.git
+cd Intelligent-aws-cost-optimizer
 ```
 
----
+### 2. Create a Virtual Environment
 
-# 📸 Project Screenshots
+Windows:
 
-## Jenkins Pipeline
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+```
 
-![](screenshots/jenkins_pipeline.png)
+Linux:
 
----
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
 
-## Jenkins Successful Build
+### 3. Install Dependencies
 
-![](screenshots/jenkins_success.png)
+```bash
+pip install -r requirements.txt
+```
 
----
+### 4. Configure AWS Credentials
 
-## GitHub Webhook Trigger
+Configure the AWS CLI:
 
-![](screenshots/github_trigger.png)
+```bash
+aws configure
+```
 
----
+Set your AWS region to:
 
-## SonarQube Analysis
+```text
+ap-south-1
+```
 
-![](screenshots/sonarqube.png)
+Verify your AWS identity:
 
----
+```bash
+aws sts get-caller-identity
+```
 
-## Docker Hub Image
+Use an IAM identity with only the permissions required by the application. Never commit AWS access keys or secret credentials to GitHub.
 
-![](screenshots/dockerhub.png)
+### 5. Run the Dashboard
 
----
+```bash
+python -m streamlit run dashboard/app.py
+```
 
-## AWS Lambda
+Open the local URL displayed in the terminal, usually:
 
-![](screenshots/lambda_function.png)
+```text
+http://localhost:8501
+```
 
----
+## Docker Usage
 
-## Lambda IAM Role
-
-![](screenshots/lambda_role.png)
-
----
-
-## EventBridge Scheduler
-
-![](screenshots/Eventbridge.png)
-
----
-
-## SNS Topic
-
-![](screenshots/sns.png)
-
----
-
-## SNS Email Notification
-
-![](screenshots/sns_email.png)
-
----
-
-## EC2 Resources
-
-![](screenshots/Ec2_instance.png)
-
----
-
-## S3 Bucket
-
-![](screenshots/s3_bkt.png)
-
----
-
-# 📦 Docker
-
-Build Image
+Build the Docker image:
 
 ```bash
 docker build -t aws-cost-optimizer .
 ```
 
-Run Container
+Run the container:
 
 ```bash
-docker run aws-cost-optimizer
+docker run -p 8501:8501 aws-cost-optimizer
 ```
 
----
+Open the dashboard at `http://localhost:8501`.
 
-# ⚡ Jenkins Pipeline Stages
+## AWS Services Used
 
-- Workspace Cleanup
-- Git Checkout
-- Python Environment Setup
-- Install Dependencies
-- AWS Cost Analysis
-- SonarQube Scan
-- Docker Image Build
-- Trivy Scan
-- Push Docker Image
-- Deploy AWS Lambda
+| AWS Service | Purpose |
+|---|---|
+| Amazon EC2 | Monitors virtual machine instances. |
+| Amazon EBS | Identifies potentially unused storage volumes. |
+| EBS Snapshots | Reviews backup snapshots. |
+| Elastic IP | Identifies potentially unused static IP addresses. |
+| Amazon S3 | Monitors storage buckets. |
+| Amazon RDS | Checks database instances. |
+| AWS Lambda | Executes the Python analysis. |
+| Amazon EventBridge | Triggers scheduled Lambda executions. |
+| Amazon SNS | Sends report notifications through email. |
+| Amazon CloudWatch | Provides metrics such as EC2 CPU utilization. |
 
----
+## Project Structure
 
-# 📈 AWS Services Used
+```text
+Intelligent-aws-cost-optimizer/
+│
+├── dashboard/
+│   └── app.py
+│
+├── src/
+│   └── lambda_function.py
+│
+├── tests/
+│
+├── lambda_requirements.txt
+├── requirements.txt
+├── Dockerfile
+├── Jenkinsfile
+├── .dockerignore
+└── README.md
+```
 
-- AWS Lambda
-- Amazon SNS
-- Amazon EventBridge
-- Amazon IAM
-- Amazon EC2
-- Amazon EBS
-- Amazon S3
-- Amazon RDS
+*The structure above highlights the main project files; additional modules and configuration files may also be present.*
 
----
+## Project Results
 
-# 📬 Email Report
+The project has been tested with a live AWS account and a working deployment pipeline.
 
-The generated report includes:
+- Successfully connected the dashboard to a live AWS account.
+- Retrieved live AWS resource information.
+- Generated a cost optimization report.
+- Successfully delivered a report notification through Amazon SNS email.
+- Executed automated unit tests in Jenkins.
+- Completed SonarQube analysis and Trivy image scanning stages.
+- Built and pushed the Docker image to Docker Hub.
+- Packaged and deployed the Lambda function.
+- Verified successful Lambda deployment and active function state.
 
-- Stopped EC2 Instances
-- Unused EBS Volumes
-- Old Snapshots
-- Unused Elastic IPs
-- S3 Buckets
-- RDS Instances
+## Security and Cost Considerations
 
-Automatically delivered through Amazon SNS.
+- The application provides recommendations and does not automatically modify AWS resources.
+- AWS credentials should be stored securely and never committed to the repository.
+- IAM permissions should follow the principle of least privilege.
+- Review AWS resource usage and billing before creating additional infrastructure.
+- Review Trivy scan results before deploying container images.
+- Restrict access to Jenkins and SonarQube.
+- Configure an appropriate EventBridge schedule to avoid unnecessary report notifications.
 
----
+## Future Enhancements
 
-# 🎯 Future Improvements
+- Add predictive cost analysis using historical usage data.
+- Integrate Amazon SES for customized HTML email reports.
+- Add more CloudWatch metrics for better resource utilization analysis.
+- Introduce approval-based automated optimization actions.
+- Add multi-account AWS monitoring.
+- Improve dashboard visualizations and reporting.
 
-- Cost Explorer Integration
-- Trusted Advisor Integration
-- AWS Budgets Support
-- Slack Notifications
-- Grafana Dashboard
-- Multi-Account AWS Support
-- Daily Cost Trend Analytics
+## Learning Outcomes
 
----
+Through this project, I gained practical experience with:
 
-# 👩‍💻 Author
+- AWS resource management using Boto3.
+- Serverless automation using AWS Lambda.
+- Scheduled execution using Amazon EventBridge.
+- Notifications using Amazon SNS.
+- Cloud monitoring using Amazon CloudWatch.
+- Dashboard development using Streamlit.
+- CI/CD automation using Jenkins.
+- Static code analysis using SonarQube.
+- Container security scanning using Trivy.
+- Docker image management and AWS Lambda deployment.
+
+## Author
 
 **Riya Kumari**
 
-DevOps & Cloud Engineer
+B.Tech Computer Science and Engineering | 2027 Batch
 
-- LinkedIn: https://www.linkedin.com/in/riya-kumari-79a709302/
+**Areas of Interest:** AWS Cloud | DevOps | Cloud Automation | DevSecOps
+
 - GitHub: https://github.com/Riya-te
+- Portfolio: https://portfolio.riyaa.xyz
 
 ---
 
-## ⭐ If you like this project, don't forget to Star the repository!
+*This project was developed as a practical implementation of AWS cost monitoring, optimization recommendations, serverless automation, and DevSecOps CI/CD practices.*
